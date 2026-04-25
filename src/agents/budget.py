@@ -56,7 +56,7 @@ def evaluate_budget(plan: dict, candidates: list) -> dict:
     )
 
     response = client.chat.completions.create(
-        model="perplexity/llama-3.1-sonar-small-128k-online",
+        model="perplexity/sonar",
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_content},
