@@ -1,0 +1,31 @@
+# AI 데이트 플래너 — 프로젝트 목표 선언
+
+## 목표
+사용자가 지역, 인원, 예산, 분위기를 입력하면  
+여러 AI 에이전트가 서로 토론하여 최적의 데이트 코스를 추천한다.
+
+## 에이전트 역할 분담
+
+| 에이전트 | 모델 | 역할 |
+|---------|------|------|
+| Planner | Claude (강함) | 요청 분석, 전략 수립 |
+| Scout | Mixtral (보통) | Kakao API로 장소 탐색 |
+| Budget | DeepSeek (보통) | 예산 최적화 검토 |
+| Vibe | Mixtral (보통) | 분위기/감성 평가 |
+| Verifier | Claude (강함) | 토론 결과 최종 검증 |
+
+## 토론 프로토콜
+1. Planner가 요청 분석 → 구조화된 플랜 생성
+2. Scout → Budget → Vibe 순으로 각자 평가
+3. 예산 미통과 or 분위기 점수 7 미만 시 재토론 (최대 3라운드)
+4. Verifier(Claude)가 최종 코스 확정
+
+## 팀 역할 분담
+
+- **팀원 A**: 에이전트 로직 (`src/agents/`, `src/debate.py`)
+- **팀원 B**: 인프라 (`Dockerfile`, `docker-compose.yml`, `api/`, `docs/`)
+
+## 성공 기준
+- 예산 초과 없이 코스 구성
+- Vibe 점수 7점 이상
+- 3라운드 이내 합의
