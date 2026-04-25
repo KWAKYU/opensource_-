@@ -53,7 +53,7 @@ SUBWAY_KEYWORDS = ["지하", "지하상가", "지하도", "역사", "지하철"]
 
 def search_places(keyword: str, x=None, y=None, radius: int = 900) -> pd.DataFrame:
     headers = {"Authorization": f"KakaoAK {os.getenv('KAKAO_API_KEY')}"}
-    params = {"query": keyword, "size": 20}
+    params = {"query": keyword, "size": 15}
     if x and y:
         # Kakao는 좌표 검색 시 sort=accuracy 미지원 → distance 사용
         params.update({"x": x, "y": y, "radius": radius, "sort": "distance"})
