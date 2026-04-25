@@ -64,7 +64,7 @@ def run_debate(user_input, initial_plan, exclude_places=None):
         st.json(initial_plan)
         s.update(label="✅ Planner — 전략 확정", state="complete")
 
-    for round_num in range(1, 4):
+    for round_num in range(1, 6):
         st.markdown(f"**— Round {round_num} —**")
 
         with st.status(f"🔍 Scout (Gemma) — 장소 탐색 중...", expanded=False) as s:
@@ -98,10 +98,10 @@ def run_debate(user_input, initial_plan, exclude_places=None):
             debate_log.append({"round": round_num, "agent": "Experience", "result": vibe_result})
             s.update(label=f"✅ Experience — {score}/10점", state="complete")
 
-        if approved and score >= 7:
+        if round_num >= 2 and approved and score >= 7:
             st.success(f"✅ Round {round_num}에서 합의 완료!")
             break
-        elif round_num < 3:
+        elif round_num < 5:
             st.warning("합의 미달 → 재토론")
 
     with st.status("🏆 Verifier (Claude Haiku) — 최종 검증 중...", expanded=False) as s:
