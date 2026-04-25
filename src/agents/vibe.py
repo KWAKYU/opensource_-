@@ -1,11 +1,11 @@
 from openai import OpenAI
 import os, json, re
 
-SYSTEM_PROMPT = """당신은 분위기 평가 에이전트입니다.
-데이트 코스의 흐름, 감성, 분위기가 요청과 맞는지 평가하세요.
-반박이 있으면 반박하고 대안을 제시하세요.
+SYSTEM_PROMPT = """당신은 코스 경험 평가 에이전트입니다.
+추천된 코스의 흐름, 동선, 테마 일치도를 평가하세요.
+코스가 단조롭거나 테마와 맞지 않으면 반박하고 개선안을 제시하세요.
 반드시 아래 형식으로만 응답하세요 (다른 텍스트 없이):
-{"score": 8, "feedback": "분위기 평가", "objection": null, "alternative": null}"""
+{"score": 8, "feedback": "코스 평가", "objection": null, "alternative": null}"""
 
 
 def _parse_json(text: str) -> dict:
@@ -27,7 +27,7 @@ def evaluate_vibe(plan: dict, candidates: list, budget_result: dict) -> dict:
         model="mistralai/mixtral-8x7b-instruct",
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": f"원하는 분위기: {plan['mood']}\n코스: {json.dumps(candidates, ensure_ascii=False)}\n예산 평가: {json.dumps(budget_result, ensure_ascii=False)}"},
+            {"role": "user", "content": f"코스 테마: {plan.get('theme', plan.get('mood', ''))}\n코스: {json.dumps(candidates, ensure_ascii=False)}\n예산 평가: {json.dumps(budget_result, ensure_ascii=False)}"},
         ],
         max_tokens=500,
     )

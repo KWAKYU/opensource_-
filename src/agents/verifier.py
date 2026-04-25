@@ -2,7 +2,7 @@ from openai import OpenAI
 import os, json, re
 
 SYSTEM_PROMPT = """당신은 최종 검증 에이전트(Claude)입니다.
-Scout, Budget, Vibe 에이전트의 토론 결과를 종합해서 최적의 데이트 코스를 확정하세요.
+Scout, Budget, Experience 에이전트의 토론 결과를 종합해서 최적의 서울 나들이 코스를 확정하세요.
 반드시 아래 형식으로만 응답하세요 (다른 텍스트 없이):
 {
   "final_course": [{"order": 1, "place": "장소명", "category": "카테고리", "address": "주소", "estimated_cost": 숫자}],
