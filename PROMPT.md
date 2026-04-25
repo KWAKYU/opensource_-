@@ -8,11 +8,11 @@
 
 | 에이전트 | 모델 | 역할 |
 |---------|------|------|
-| Planner | Claude (강함) | 요청 분석, 전략 수립 |
-| Scout | Mixtral (보통) | Kakao API로 장소 탐색 |
-| Budget | DeepSeek (보통) | 예산 최적화 검토 |
-| Vibe | Mixtral (보통) | 분위기/감성 평가 |
-| Verifier | Claude (강함) | 토론 결과 최종 검증 |
+| Planner | Claude Sonnet 4.6 | 요청 분석, 전략 수립 |
+| Scout | Claude Sonnet 4.6 | Kakao API로 장소 탐색 및 품질 검증 |
+| Budget | Perplexity Sonar | 웹 검색 기반 실제 가격 추정 및 예산 검토 |
+| Experience | Gemma 3 27B | 네이버 블로그 후기 기반 분위기/코스 흐름 평가 |
+| Verifier | Claude Haiku | 토론 결과 최종 검증 및 코스 확정 |
 
 ## 토론 프로토콜
 1. Planner가 요청 분석 → 구조화된 플랜 생성
@@ -27,5 +27,5 @@
 
 ## 성공 기준
 - 예산 초과 없이 코스 구성
-- Vibe 점수 7점 이상
-- 3라운드 이내 합의
+- Experience 점수 7점 이상
+- 최대 5라운드 이내 합의
