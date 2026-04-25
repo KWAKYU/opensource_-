@@ -74,8 +74,9 @@ def scout(plan: dict, exclude_places: list = None) -> list:
 
     candidates = []
     coord_map = {}
+    duration = plan.get("duration", "반나절")
     for item in plan["schedule"]:
-        df = search_by_category(item, location, budget_per)
+        df = search_by_category(item, location, budget_per, duration=duration)
         if not df.empty:
             # 제외 장소 필터링 후 최대 6개
             df_filtered = df[~df["place_name"].isin(exclude_set)]
@@ -116,7 +117,8 @@ def scout_one(plan: dict, category: str, exclude_places: list = None) -> dict:
     budget_per = plan["budget_total"] // max(len(plan.get("schedule", [1])), 1)
     exclude_set = set(exclude_places or [])
 
-    df = search_by_category(category, location, budget_per)
+    duration = plan.get("duration", "반나절")
+    df = search_by_category(category, location, budget_per, duration=duration)
     coord_map = {}
     if not df.empty:
         df_filtered = df[~df["place_name"].isin(exclude_set)]
