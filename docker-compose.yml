@@ -1,6 +1,13 @@
 version: "3.9"
 
 services:
+  streamlit:
+    build: .
+    env_file: .env
+    ports:
+      - "8501:8501"
+    command: streamlit run app.py --server.port 8501 --server.address 0.0.0.0
+
   cli:
     build: .
     env_file: .env
