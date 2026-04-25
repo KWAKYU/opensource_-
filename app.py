@@ -115,10 +115,28 @@ if run:
     st.divider()
     st.subheader(f"📍 {location} 추천 코스")
 
+    CATEGORY_ICON = {
+        "카페":    "☕",
+        "체인카페": "🏪",
+        "맛집":    "🍽️",
+        "패스트푸드": "🍔",
+        "디저트":  "🍰",
+        "방탈출":  "🔐",
+        "공방·체험": "🎨",
+        "액티비티": "🎳",
+        "문화·전시": "🖼️",
+        "포토스팟": "📸",
+        "쇼핑":    "🛍️",
+        "바·주점": "🍺",
+        "공원·자연": "🌿",
+    }
+
     course = final.get("final_course", [])
     for step in course:
         place_name = step.get('place', '')
         address    = step.get('address', '')
+        category   = step.get('category', '')
+        icon       = CATEGORY_ICON.get(category, "📍")
         query      = f"{place_name} {address}".strip()
         naver_url  = f"https://map.naver.com/v5/search/{query}"
 
@@ -126,7 +144,7 @@ if run:
             col_a, col_b = st.columns([3, 1])
             with col_a:
                 st.markdown(f"**{step.get('order', '')}. {place_name}**")
-                st.caption(f"📂 {step.get('category', '')}  |  📍 {address}")
+                st.caption(f"{icon} {category}  |  📍 {address}")
                 st.markdown(f"[🗺️ 네이버 지도에서 보기]({naver_url})")
             with col_b:
                 st.metric("예상 비용", f"{step.get('estimated_cost', 0):,}원")
