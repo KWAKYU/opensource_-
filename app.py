@@ -8,6 +8,8 @@ load_dotenv()
 try:
     os.environ.setdefault("OPENROUTER_API_KEY", st.secrets["OPENROUTER_API_KEY"])
     os.environ.setdefault("KAKAO_API_KEY", st.secrets["KAKAO_API_KEY"])
+    os.environ.setdefault("NAVER_CLIENT_ID", st.secrets.get("NAVER_CLIENT_ID", ""))
+    os.environ.setdefault("NAVER_CLIENT_SECRET", st.secrets.get("NAVER_CLIENT_SECRET", ""))
 except Exception:
     pass  # 로컬 환경에서는 .env 사용
 
