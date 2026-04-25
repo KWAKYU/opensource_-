@@ -110,11 +110,17 @@ if run:
 
     course = final.get("final_course", [])
     for step in course:
+        place_name = step.get('place', '')
+        address    = step.get('address', '')
+        query      = f"{place_name} {address}".strip()
+        naver_url  = f"https://map.naver.com/v5/search/{query}"
+
         with st.container(border=True):
             col_a, col_b = st.columns([3, 1])
             with col_a:
-                st.markdown(f"**{step.get('order', '')}. {step.get('place', '')}**")
-                st.caption(f"📂 {step.get('category', '')}  |  📍 {step.get('address', '')}")
+                st.markdown(f"**{step.get('order', '')}. {place_name}**")
+                st.caption(f"📂 {step.get('category', '')}  |  📍 {address}")
+                st.markdown(f"[🗺️ 네이버 지도에서 보기]({naver_url})")
             with col_b:
                 st.metric("예상 비용", f"{step.get('estimated_cost', 0):,}원")
 
