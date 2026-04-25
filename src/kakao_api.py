@@ -2,12 +2,11 @@ import os
 import requests
 import pandas as pd
 
-KAKAO_API_KEY = os.getenv("KAKAO_API_KEY")
 BASE_URL = "https://dapi.kakao.com/v2/local/search/keyword.json"
 
 
 def search_places(keyword: str, x: str = None, y: str = None, radius: int = 2000) -> pd.DataFrame:
-    headers = {"Authorization": f"KakaoAK {KAKAO_API_KEY}"}
+    headers = {"Authorization": f"KakaoAK {os.getenv('KAKAO_API_KEY')}"}
     params = {"query": keyword, "size": 10}
     if x and y:
         params.update({"x": x, "y": y, "radius": radius, "sort": "distance"})
