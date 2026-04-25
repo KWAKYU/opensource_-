@@ -49,7 +49,7 @@ def verify(plan: dict, candidates: list, budget_result: dict, vibe_result: dict)
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": f"토론 전체 내용:\n{json.dumps(debate_context, ensure_ascii=False, indent=2)}"},
         ],
-        max_tokens=1000,
+        max_tokens=600,
     )
     content = response.choices[0].message.content or "{}"
     return _parse_json(content)
