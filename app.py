@@ -2,6 +2,7 @@ import streamlit as st
 import json
 import os
 import pandas as pd
+from urllib.parse import quote
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -146,7 +147,7 @@ def show_results(result, budget_input, location_input):
         address    = step.get("address", "")
         category   = step.get("category", "")
         icon       = CATEGORY_ICON.get(category, "📍")
-        naver_url  = f"https://map.naver.com/v5/search/{place_name} {address}".strip()
+        naver_url  = f"https://map.naver.com/v5/search/{quote(place_name)}"
 
         with st.container(border=True):
             col_a, col_b, col_c = st.columns([3, 1, 1])
@@ -155,7 +156,9 @@ def show_results(result, budget_input, location_input):
                 st.caption(f"{icon} {category}  |  📍 {address}")
                 st.markdown(f"[🗺️ 네이버 지도에서 보기]({naver_url})")
             with col_b:
-                st.metric("예상 비용", f"{step.get('estimated_cost', 0):,}원")
+                cost = step.get('estimated_cost', 0)
+                st.markdown(f"**예상 비용**")
+                st.markdown(f"### {cost:,}원")
             with col_c:
                 if st.button("🔄 리롤", key=f"reroll_{i}"):
                     used = st.session_state.get("used_places", set())
