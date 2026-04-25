@@ -124,6 +124,32 @@ def search_vibe_from_blog(place_name: str) -> str:
     return "\n".join(vibe_info) if vibe_info else ""
 
 
+def get_blog_count(place_name: str) -> int:
+    """네이버 블로그 언급 수 조회 — 인기도 지표로 사용"""
+    headers = _naver_headers()
+    if not headers["X-Naver-Client-Id"]:
+        return 0
+    params = {"query": place_name, "display": 1, "sort": "sim"}
+    try:
+        r = requests.get(BLOG_SEARCH_URL, headers=headers, params=params, timeout=2)
+        r.raise_for_status()
+        return r.json().get("total", 0)
+    except Exception:
+        return 0
+
+
+def add_blog_counts(candidates_per_category: list) -> list:
+    """후보 리스트에 blog_count 필드 추가 (Scout용)"""
+    enriched = []
+    for group in candidates_per_category:
+        enriched_group = []
+        for place in group:
+            count = get_blog_count(place.get("place_name", ""))
+            enriched_group.append({**place, "blog_count": count})
+        enriched.append(enriched_group)
+    return enriched
+
+
 def get_vibes_for_candidates(candidates: list) -> dict:
     """후보 장소 목록의 분위기 정보를 일괄 수집"""
     vibe_data = {}

@@ -48,11 +48,14 @@ def get_radius(location: str, duration: str) -> int:
     return RADIUS_BY_DURATION.get(duration, 900)
 
 
+SUBWAY_KEYWORDS = ["지하", "지하상가", "지하도", "역사", "지하철"]
+
+
 def search_places(keyword: str, x=None, y=None, radius: int = 900) -> pd.DataFrame:
     headers = {"Authorization": f"KakaoAK {os.getenv('KAKAO_API_KEY')}"}
-    params = {"query": keyword, "size": 15}
+    params = {"query": keyword, "size": 20, "sort": "accuracy"}
     if x and y:
-        params.update({"x": x, "y": y, "radius": radius, "sort": "distance"})
+        params.update({"x": x, "y": y, "radius": radius})
 
     response = requests.get(BASE_URL, headers=headers, params=params)
     response.raise_for_status()
@@ -65,6 +68,13 @@ def search_places(keyword: str, x=None, y=None, radius: int = 900) -> pd.DataFra
     df["distance"] = pd.to_numeric(df["distance"], errors="coerce").fillna(0).astype(int)
     df["x"] = pd.to_numeric(df["x"], errors="coerce")
     df["y"] = pd.to_numeric(df["y"], errors="coerce")
+
+    # 지하철역 내부·지하상가 장소 제외 (분식집·패스트푸드 등 역사 내 저품질 가게)
+    mask = df["address_name"].apply(
+        lambda addr: not any(k in str(addr) for k in SUBWAY_KEYWORDS)
+    )
+    df = df[mask]
+
     return df
 
 

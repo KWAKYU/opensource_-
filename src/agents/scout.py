@@ -1,18 +1,35 @@
 from openai import OpenAI
 from src.kakao_api import search_by_category
+from src.naver_api import add_blog_counts
 import os, json, re
 import pandas as pd
 
 SYSTEM_PROMPT = """당신은 서울 나들이 코스의 장소 큐레이터(Scout)입니다.
 주어진 후보 데이터에서 실제로 가볼 만한 곳만 엄선해서 JSON으로 반환하세요.
 
-━━━ 선정 기준 (엄격하게 적용) ━━━
+━━━ 선정 기준 최우선순위 ━━━
 
-[인기도 필터 — 아래 중 하나라도 해당하면 제외]
-- 이름이 지나치게 일반적이거나 프랜차이즈 느낌 (예: "○○네 식당", 무명 체인)
-- 온라인 존재감이 거의 없을 것 같은 신생/무명 장소
-- 리뷰·후기가 거의 없을 것으로 추정되는 곳 (오픈한 지 얼마 안 된 듯, 검색 결과가 없을 듯)
-→ 해당 지역에서 실제로 알려진 곳, SNS나 블로그에 후기가 많을 것 같은 곳 우선 선택
+【인기도 > 거리 > 가격】 — 가까운 곳보다 유명한 곳이 우선이다
+
+[blog_count 필드 활용 — 핵심 지표]
+- blog_count: 네이버 블로그 언급 수 → 높을수록 실제 방문자가 많은 인기 장소
+- blog_count 1000 이상: 검증된 인기 장소 → 강력 우선 선택
+- blog_count 300~999: 준인기 장소 → 테마 맞으면 선택
+- blog_count 100 미만: 신생·무명 장소 → 다른 후보가 있으면 제외
+- blog_count 0: 온라인 존재감 없음 → 원칙적으로 제외
+
+[절대 제외 — 품질 필터]
+- 지하철역 내부·지하상가 음식점 (address에 "지하" 포함)
+- 이름이 "○○역 ○○", "역사 내 ○○" 형태인 곳
+- 분식집, 저가 간식 포장마차 (3,000~5,000원대 저가 식사)
+- 무명 체인, 프랜차이즈 느낌의 일반 가게
+- 온라인 존재감이 거의 없는 신생·무명 장소
+
+[우선 선택 조건]
+- 해당 지역 대표 핫플레이스, SNS·블로그 자주 언급되는 곳
+- 인스타그램 태그가 많을 것 같은 감성 장소
+- 현지인이 아닌 외부 방문자(서울 나들이객)도 찾아오는 목적지형 장소
+- 평균 이상 가격대 (맛집 1인 15,000원 이상, 카페 7,000원 이상)
 
 [카테고리 분류 기준 — 반드시 아래 중 하나만 사용]
 | category 값  | 해당하는 장소 | 절대 포함하지 말 것 |
@@ -95,12 +112,16 @@ def scout(plan: dict, exclude_places: list = None) -> list:
                     "lng": float(row["x"]) if pd.notna(row["x"]) else None,
                 }
 
+    # 네이버 블로그 언급수로 인기도 지표 추가
+    print("    [블로그 카운트] 후보 장소 인기도 조회 중...")
+    candidates = add_blog_counts(candidates)
+
     exclude_note = f"\n제외할 장소 (이미 추천됨, 절대 포함 금지): {list(exclude_set)}" if exclude_set else ""
     response = client.chat.completions.create(
         model="openai/gpt-4o-mini",
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": f"플랜: {json.dumps(plan, ensure_ascii=False)}\n후보 데이터: {json.dumps(candidates, ensure_ascii=False)}{exclude_note}"},
+            {"role": "user", "content": f"플랜: {json.dumps(plan, ensure_ascii=False)}\n후보 데이터 (blog_count=네이버 블로그 언급수·인기도): {json.dumps(candidates, ensure_ascii=False)}{exclude_note}"},
         ],
         max_tokens=1000,
     )
@@ -139,12 +160,15 @@ def scout_one(plan: dict, category: str, exclude_places: list = None) -> dict:
     else:
         return {}
 
+    enriched = add_blog_counts([candidates])
+    candidates = enriched[0] if enriched else candidates
+
     exclude_note = f"\n제외할 장소: {list(exclude_set)}" if exclude_set else ""
     response = client.chat.completions.create(
         model="openai/gpt-4o-mini",
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": f"아래 후보 중 {category} 카테고리에서 가장 적합한 장소 1곳만 추천하세요.\n후보: {json.dumps(candidates, ensure_ascii=False)}{exclude_note}"},
+            {"role": "user", "content": f"아래 후보 중 {category} 카테고리에서 가장 적합한 장소 1곳만 추천하세요 (blog_count 높은 곳 우선).\n후보: {json.dumps(candidates, ensure_ascii=False)}{exclude_note}"},
         ],
         max_tokens=300,
     )
