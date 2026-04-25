@@ -35,7 +35,12 @@ with col2:
     theme = st.selectbox("🎯 테마", ["맛집 투어", "카페 투어", "문화/예술", "포토스팟", "힐링", "액티비티", "쇼핑"])
 
 duration = st.select_slider("⏱️ 소요 시간", options=["2시간", "반나절", "하루 종일"], value="반나절")
-extra = st.text_input("기타 요청 (선택)", placeholder="대중교통 이용, 실내 위주, 영어 메뉴 있는 곳...")
+
+col3, col4 = st.columns(2)
+with col3:
+    allow_chains = st.checkbox("🏪 체인점 포함 (스타벅스, 메가커피, 맥도날드 등)", value=False)
+with col4:
+    extra = st.text_input("기타 요청 (선택)", placeholder="대중교통 이용, 실내 위주, 영어 메뉴 있는 곳...")
 
 run = st.button("🤖 코스 추천받기", use_container_width=True, type="primary")
 
@@ -45,6 +50,8 @@ if run:
         st.stop()
 
     user_input = f"{location}, {people}명, 예산 {budget}원, {theme}, {duration}"
+    if not allow_chains:
+        user_input += ", 체인점 제외 (스타벅스·메가커피·이디야·컴포즈·맥도날드·버거킹·KFC·파리바게뜨 등 프랜차이즈 제외, 독립 로컬 매장만)"
     if extra:
         user_input += f", {extra}"
 
