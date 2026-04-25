@@ -15,14 +15,36 @@ SYSTEM_PROMPT = """당신은 서울 코스 추천 팀의 오케스트레이터�
 
 
 def _parse_json(text: str) -> dict:
+    fallback = {
+        "location": "서울",
+        "budget_total": 50000,
+        "people": 2,
+        "theme": "나들이",
+        "schedule": ["맛집", "카페"],
+        "constraints": []
+    }
+    if not text or not text.strip():
+        return fallback
     text = text.strip()
+    # ```json 블록 추출
     match = re.search(r"```(?:json)?\s*([\s\S]+?)```", text)
     if match:
         text = match.group(1).strip()
-    json_match = re.search(r"\{[\s\S]+\}", text)
-    if json_match:
-        text = json_match.group(0)
-    return json.loads(text)
+    # bracket-depth로 정확한 JSON 범위 추출
+    start = text.find("{")
+    if start != -1:
+        depth = 0
+        for i, c in enumerate(text[start:], start):
+            if c == "{": depth += 1
+            elif c == "}":
+                depth -= 1
+                if depth == 0:
+                    text = text[start:i+1]
+                    break
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        return fallback
 
 
 def plan(user_input: str) -> dict:
