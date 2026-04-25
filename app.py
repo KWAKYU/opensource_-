@@ -3,7 +3,13 @@ import json
 import os
 from dotenv import load_dotenv
 
+# 로컬: .env 파일 / Streamlit Cloud: st.secrets 자동 사용
 load_dotenv()
+try:
+    os.environ.setdefault("OPENROUTER_API_KEY", st.secrets["OPENROUTER_API_KEY"])
+    os.environ.setdefault("KAKAO_API_KEY", st.secrets["KAKAO_API_KEY"])
+except Exception:
+    pass  # 로컬 환경에서는 .env 사용
 
 from src.agents.planner import plan
 from src.agents.scout import scout
