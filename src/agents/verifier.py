@@ -44,7 +44,7 @@ def verify(plan: dict, candidates: list, budget_result: dict, vibe_result: dict)
         "vibe_evaluation": vibe_result,
     }
     response = client.chat.completions.create(
-        model="anthropic/claude-sonnet-4-6",
+        model="anthropic/claude-3-haiku",
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": f"토론 전체 내용:\n{json.dumps(debate_context, ensure_ascii=False, indent=2)}"},
@@ -52,4 +52,16 @@ def verify(plan: dict, candidates: list, budget_result: dict, vibe_result: dict)
         max_tokens=600,
     )
     content = response.choices[0].message.content or "{}"
-    return _parse_json(content)
+    result = _parse_json(content)
+
+    # LLM이 비용을 0으로 뱉는 경우 budget_result 데이터로 보정
+    budget_per = plan.get("budget_total", 0) // max(len(plan.get("schedule", [1])), 1)
+    for step in result.get("final_course", []):
+        if not step.get("estimated_cost"):
+            step["estimated_cost"] = budget_per
+
+    # total_cost는 항상 코드에서 재계산 (LLM 신뢰 안 함)
+    result["total_cost"] = sum(
+        s.get("estimated_cost", 0) for s in result.get("final_course", [])
+    )
+    return result
