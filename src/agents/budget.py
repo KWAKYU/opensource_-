@@ -78,7 +78,7 @@ def evaluate_budget(plan: dict, candidates: list) -> dict:
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_content},
         ],
-        max_tokens=500,
+        max_tokens=800,
     )
     content = response.choices[0].message.content or "{}"
     result = _parse_json(content)

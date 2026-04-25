@@ -87,9 +87,10 @@ def _parse_json(text: str) -> dict:
         return {"candidates": []}
 
 
-def scout(plan: dict, exclude_places: list = None) -> list:
+def scout(plan: dict, exclude_places: list = None, previous_feedback: str = None) -> list:
     """
     exclude_places: 이미 추천된 장소명 목록 (리롤 시 제외)
+    previous_feedback: 이전 라운드 Experience 에이전트의 반박/피드백 (재토론 시 반영)
     """
     client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=os.getenv("OPENROUTER_API_KEY"))
     location = plan["location"]
@@ -102,9 +103,9 @@ def scout(plan: dict, exclude_places: list = None) -> list:
     for item in plan["schedule"]:
         df = search_by_category(item, location, budget_per, duration=duration)
         if not df.empty:
-            # 제외 장소 필터링 후 최대 6개
+            # 제외 장소 필터링 후 최대 8개
             df_filtered = df[~df["place_name"].isin(exclude_set)]
-            top = df_filtered.head(6) if not df_filtered.empty else df.head(6)
+            top = df_filtered.head(8) if not df_filtered.empty else df.head(8)
             candidates.append(top.to_dict(orient="records"))
             for _, row in top.iterrows():
                 coord_map[row["place_name"]] = {
@@ -117,13 +118,15 @@ def scout(plan: dict, exclude_places: list = None) -> list:
     candidates = add_blog_counts(candidates)
 
     exclude_note = f"\n제외할 장소 (이미 추천됨, 절대 포함 금지): {list(exclude_set)}" if exclude_set else ""
+    feedback_note = f"\n\n★ 이전 라운드 평가에서 지적된 문제점 — 반드시 반영하여 개선된 장소 선택:\n{previous_feedback}" if previous_feedback else ""
+
     response = client.chat.completions.create(
         model="openai/gpt-4o-mini",
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": f"플랜: {json.dumps(plan, ensure_ascii=False)}\n후보 데이터 (blog_count=네이버 블로그 언급수·인기도): {json.dumps(candidates, ensure_ascii=False)}{exclude_note}"},
+            {"role": "user", "content": f"플랜: {json.dumps(plan, ensure_ascii=False)}\n후보 데이터 (blog_count=네이버 블로그 언급수·인기도): {json.dumps(candidates, ensure_ascii=False)}{exclude_note}{feedback_note}"},
         ],
-        max_tokens=1000,
+        max_tokens=1200,
     )
     content = response.choices[0].message.content or "{}"
     result = _parse_json(content)

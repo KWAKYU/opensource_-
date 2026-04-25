@@ -77,7 +77,7 @@ def evaluate_vibe(plan: dict, candidates: list, budget_result: dict) -> dict:
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_content},
         ],
-        max_tokens=500,
+        max_tokens=800,
     )
     content = response.choices[0].message.content or "{}"
     return _parse_json(content)

@@ -57,6 +57,7 @@ def run_debate(user_input, initial_plan, exclude_places=None):
     candidates = []
     budget_result = {}
     vibe_result = {}
+    previous_feedback = None  # 이전 라운드 반박 → 다음 Scout에 전달
 
     st.subheader("🤖 에이전트 토론 과정")
 
@@ -67,8 +68,9 @@ def run_debate(user_input, initial_plan, exclude_places=None):
     for round_num in range(1, 6):
         st.markdown(f"**— Round {round_num} —**")
 
-        with st.status(f"🔍 Scout (Gemma) — 장소 탐색 중...", expanded=False) as s:
-            candidates = scout(initial_plan, exclude_places=exclude_places)
+        with st.status(f"🔍 Scout (GPT-4o mini) — 장소 탐색 중...", expanded=False) as s:
+            candidates = scout(initial_plan, exclude_places=exclude_places,
+                               previous_feedback=previous_feedback)
             st.write(f"{len(candidates)}개 장소 발견")
             for c in candidates:
                 st.write(f"• **{c.get('name', '')}** — {c.get('address', '')}")
@@ -86,7 +88,7 @@ def run_debate(user_input, initial_plan, exclude_places=None):
             icon = "✅" if approved else "⚠️"
             s.update(label=f"{icon} Budget — {'승인' if approved else '예산 초과'} ({total:,}원)", state="complete")
 
-        with st.status(f"✨ Experience (Gemma) — 코스 평가 중...", expanded=False) as s:
+        with st.status(f"✨ Experience (Gemini) — 코스 평가 중...", expanded=False) as s:
             vibe_result = evaluate_vibe(initial_plan, candidates, budget_result)
             score = vibe_result.get("score", 0)
             feedback = vibe_result.get("feedback", "")
@@ -98,11 +100,21 @@ def run_debate(user_input, initial_plan, exclude_places=None):
             debate_log.append({"round": round_num, "agent": "Experience", "result": vibe_result})
             s.update(label=f"✅ Experience — {score}/10점", state="complete")
 
-        if round_num >= 2 and approved and score >= 7:
-            st.success(f"✅ Round {round_num}에서 합의 완료!")
+            # 다음 라운드 Scout에 전달할 피드백 구성
+            previous_feedback = f"점수: {score}/10\n평가: {feedback}"
+            if objection:
+                previous_feedback += f"\n반박: {objection}"
+
+        if round_num >= 2 and approved and score >= 8:
+            st.success(f"✅ Round {round_num}에서 합의 완료! (점수 {score}/10)")
             break
         elif round_num < 5:
-            st.warning("합의 미달 → 재토론")
+            reason = []
+            if not approved:
+                reason.append("예산 초과")
+            if score < 8:
+                reason.append(f"점수 미달 ({score}/10, 기준 8점)")
+            st.warning(f"합의 미달 ({', '.join(reason)}) → 재토론")
 
     with st.status("🏆 Verifier (Claude Haiku) — 최종 검증 중...", expanded=False) as s:
         final = verify(initial_plan, candidates, budget_result, vibe_result)

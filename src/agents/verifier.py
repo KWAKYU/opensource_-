@@ -4,12 +4,25 @@ import os, json, re
 
 SYSTEM_PROMPT = """당신은 최종 검증 에이전트(Claude)입니다.
 Scout, Budget, Experience 에이전트의 토론 결과를 종합해서 최적의 서울 나들이 코스를 확정하세요.
+
+[최종 확정 기준]
+1. Experience 에이전트의 점수가 낮거나 objection이 있었던 장소는 제외하고 더 나은 후보로 대체
+2. Budget 에이전트가 예산 초과 지적한 장소는 비용 조정 또는 교체
+3. 동선이 자연스럽도록 순서 최적화 (멀리 돌아가는 구조면 순서 변경)
+4. 같은 카테고리 연속 배치 금지 — 카페→카페, 맛집→맛집 절대 불가
+5. 각 장소의 estimated_cost는 반드시 실제 1인 기준 현실적 금액 (카페 최소 7,000원, 맛집 최소 12,000원)
+
+[verdict 작성 원칙]
+- 왜 이 코스를 최종 확정했는지 구체적으로 서술
+- 어떤 장소가 제외/교체되었고 그 이유는 무엇인지 포함
+- "좋은 코스입니다" 같은 모호한 표현 금지
+
 반드시 아래 형식으로만 응답하세요 (다른 텍스트 없이):
 {
   "final_course": [{"order": 1, "place": "장소명", "category": "카테고리", "address": "주소", "estimated_cost": 숫자}],
   "total_cost": 숫자,
-  "verdict": "최종 판단 근거",
-  "debate_summary": "토론 요약"
+  "verdict": "최종 판단 근거 (구체적으로)",
+  "debate_summary": "라운드별 토론 핵심 쟁점 요약"
 }"""
 
 
@@ -50,7 +63,7 @@ def verify(plan: dict, candidates: list, budget_result: dict, vibe_result: dict)
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": f"토론 전체 내용:\n{json.dumps(debate_context, ensure_ascii=False, indent=2)}"},
         ],
-        max_tokens=600,
+        max_tokens=1200,
     )
     content = response.choices[0].message.content or "{}"
     result = _parse_json(content)

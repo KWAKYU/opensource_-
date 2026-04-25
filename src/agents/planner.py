@@ -124,7 +124,7 @@ def plan(user_input: str) -> dict:
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_input},
         ],
-        max_tokens=300,
+        max_tokens=500,
     )
     content = response.choices[0].message.content or ""
     result = _parse_json(content)
