@@ -2,6 +2,52 @@ from openai import OpenAI
 from src.agents.budget import CATEGORY_COST
 import os, json, re
 
+# 이름에 이 단어가 있으면 무조건 맛집 (포토스팟/쇼핑 등으로 오분류 방지)
+FOOD_NAME_KEYWORDS = [
+    "식당", "음식점", "육회", "연어", "초밥", "스시", "삼겹", "갈비", "치킨", "돈까스",
+    "라멘", "우동", "파스타", "피자", "버거", "국밥", "설렁탕", "곱창", "떡볶이",
+    "냉면", "쌀국수", "보쌈", "족발", "샤부", "오마카세", "이자카야", "주점",
+    "불판", "구이", "찜", "탕", "전골", "정식",
+]
+
+# 반나절/하루종일별 카테고리 최대 허용 횟수
+MAX_CATEGORY_COUNT = {
+    "2시간":    {"맛집": 1, "카페": 1, "디저트": 1},
+    "반나절":   {"맛집": 1, "카페": 2, "디저트": 1},
+    "하루 종일": {"맛집": 2, "카페": 2, "디저트": 1},
+}
+
+
+def _sanitize_course(course: list, duration: str) -> list:
+    """LLM 오류 교정: 음식점 오분류 수정 + 카테고리 중복 초과 제거"""
+    limits = MAX_CATEGORY_COUNT.get(duration, MAX_CATEGORY_COUNT["반나절"])
+    counts: dict = {}
+    fixed = []
+
+    for step in course:
+        name = step.get("place", "")
+        cat = step.get("category", "")
+
+        # 1. 음식 키워드 포함인데 맛집 아닌 카테고리로 분류된 경우 → 맛집으로 강제 수정
+        if any(k in name for k in FOOD_NAME_KEYWORDS) and cat not in ("맛집", "패스트푸드", "바·주점"):
+            cat = "맛집"
+            step = {**step, "category": "맛집",
+                    "estimated_cost": max(step.get("estimated_cost", 0), CATEGORY_COST["맛집"])}
+
+        # 2. 카테고리 허용 횟수 초과 시 제거
+        limit = limits.get(cat, 99)
+        if counts.get(cat, 0) >= limit:
+            continue
+
+        counts[cat] = counts.get(cat, 0) + 1
+        fixed.append(step)
+
+    # 순서 재부여
+    for i, step in enumerate(fixed):
+        step["order"] = i + 1
+
+    return fixed
+
 SYSTEM_PROMPT = """당신은 최종 검증 에이전트(Claude)입니다.
 Scout, Budget, Experience 에이전트의 토론 결과를 종합해서 최적의 서울 나들이 코스를 확정하세요.
 
@@ -85,6 +131,10 @@ def verify(plan: dict, candidates: list, budget_result: dict, vibe_result: dict)
     for step in result.get("final_course", []):
         if not step.get("estimated_cost"):
             step["estimated_cost"] = CATEGORY_COST.get(step.get("category", ""), 10000)
+
+    # 음식점 오분류 + 카테고리 중복 초과 Python 레벨 교정
+    duration = plan.get("duration", "반나절")
+    result["final_course"] = _sanitize_course(result.get("final_course", []), duration)
 
     # total_cost는 항상 코드에서 재계산
     result["total_cost"] = sum(
