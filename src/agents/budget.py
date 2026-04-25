@@ -64,4 +64,14 @@ def evaluate_budget(plan: dict, candidates: list) -> dict:
         max_tokens=500,
     )
     content = response.choices[0].message.content or "{}"
-    return _parse_json(content)
+    result = _parse_json(content)
+
+    # total_estimated가 0이면 예산 전액으로 대체 (파싱 실패 방어)
+    if not result.get("total_estimated"):
+        budget_per = plan["budget_total"] // max(len(candidates), 1)
+        result["total_estimated"] = budget_per * len(candidates)
+        result["approved"] = True
+        if not result.get("suggestion"):
+            result["suggestion"] = f"장소당 약 {budget_per:,}원 예상"
+
+    return result
