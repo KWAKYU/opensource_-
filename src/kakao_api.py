@@ -18,8 +18,10 @@ def search_places(keyword: str, x: str = None, y: str = None, radius: int = 2000
     if not documents:
         return pd.DataFrame()
 
-    df = pd.DataFrame(documents)[["place_name", "category_name", "address_name", "distance", "place_url"]]
+    df = pd.DataFrame(documents)[["place_name", "category_name", "address_name", "distance", "place_url", "x", "y"]]
     df["distance"] = pd.to_numeric(df["distance"], errors="coerce").fillna(0).astype(int)
+    df["x"] = pd.to_numeric(df["x"], errors="coerce")  # 경도 (longitude)
+    df["y"] = pd.to_numeric(df["y"], errors="coerce")  # 위도 (latitude)
     return df
 
 

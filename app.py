@@ -115,6 +115,18 @@ if run:
     st.divider()
     st.subheader(f"📍 {location} 추천 코스")
 
+    # 지도 표시 (좌표 있는 장소만)
+    course_coords = [
+        {"lat": c.get("lat"), "lon": c.get("lng"), "name": c.get("name", "")}
+        for c in candidates
+        if c.get("lat") and c.get("lng")
+    ]
+    if course_coords:
+        import pandas as pd
+        map_df = pd.DataFrame(course_coords)
+        st.map(map_df, latitude="lat", longitude="lon", size=80, color="#00B4D8")
+
+
     CATEGORY_ICON = {
         "카페":    "☕",
         "체인카페": "🏪",

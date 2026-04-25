@@ -1,6 +1,7 @@
 from openai import OpenAI
 from src.kakao_api import search_by_category
 import os, json, re
+import pandas as pd
 
 SYSTEM_PROMPT = """당신은 장소 탐색 에이전트입니다.
 주어진 장소 데이터를 분석해서 코스에 적합한 후보를 추려 JSON으로 반환하세요.
@@ -68,10 +69,18 @@ def scout(plan: dict) -> list:
     budget_per = plan["budget_total"] // max(len(plan["schedule"]), 1)
 
     candidates = []
+    coord_map = {}  # {place_name: {lat, lng}} — LLM 거치지 않고 좌표 보존
     for item in plan["schedule"]:
         df = search_by_category(item, location, budget_per)
         if not df.empty:
-            candidates.append(df.head(3).to_dict(orient="records"))
+            top = df.head(3)
+            candidates.append(top.to_dict(orient="records"))
+            # 좌표 저장 (place_name 기준)
+            for _, row in top.iterrows():
+                coord_map[row["place_name"]] = {
+                    "lat": float(row["y"]) if pd.notna(row["y"]) else None,
+                    "lng": float(row["x"]) if pd.notna(row["x"]) else None,
+                }
 
     response = client.chat.completions.create(
         model="mistralai/mixtral-8x7b-instruct",
@@ -83,4 +92,13 @@ def scout(plan: dict) -> list:
     )
     content = response.choices[0].message.content or "{}"
     result = _parse_json(content)
-    return result.get("candidates", []) if isinstance(result, dict) else result
+    places = result.get("candidates", []) if isinstance(result, dict) else result
+
+    # LLM이 선택한 장소에 Kakao 원본 좌표 붙이기
+    for p in places:
+        name = p.get("name", "")
+        coords = coord_map.get(name, {})
+        p["lat"] = coords.get("lat")
+        p["lng"] = coords.get("lng")
+
+    return places
