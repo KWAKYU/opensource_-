@@ -147,7 +147,8 @@ def show_results(result, budget_input, location_input):
         address    = step.get("address", "")
         category   = step.get("category", "")
         icon       = CATEGORY_ICON.get(category, "📍")
-        naver_url  = f"https://map.naver.com/v5/search/{quote(place_name)}"
+        naver_query = place_name + (" " + address if address else "")
+        naver_url  = f"https://map.naver.com/v5/search/{quote(naver_query)}"
 
         with st.container(border=True):
             col_a, col_b, col_c = st.columns([3, 1, 1])

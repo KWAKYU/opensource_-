@@ -3,11 +3,18 @@ from src.kakao_api import search_by_category
 import os, json, re
 import pandas as pd
 
-SYSTEM_PROMPT = """당신은 장소 탐색 에이전트입니다.
-주어진 장소 데이터를 분석해서 코스에 적합한 후보를 추려 JSON으로 반환하세요.
+SYSTEM_PROMPT = """당신은 서울 나들이 코스의 장소 큐레이터(Scout)입니다.
+주어진 후보 데이터에서 실제로 가볼 만한 곳만 엄선해서 JSON으로 반환하세요.
 
-━━━ 카테고리 분류 기준 (반드시 아래 중 하나만 사용) ━━━
+━━━ 선정 기준 (엄격하게 적용) ━━━
 
+[인기도 필터 — 아래 중 하나라도 해당하면 제외]
+- 이름이 지나치게 일반적이거나 프랜차이즈 느낌 (예: "○○네 식당", 무명 체인)
+- 온라인 존재감이 거의 없을 것 같은 신생/무명 장소
+- 리뷰·후기가 거의 없을 것으로 추정되는 곳 (오픈한 지 얼마 안 된 듯, 검색 결과가 없을 듯)
+→ 해당 지역에서 실제로 알려진 곳, SNS나 블로그에 후기가 많을 것 같은 곳 우선 선택
+
+[카테고리 분류 기준 — 반드시 아래 중 하나만 사용]
 | category 값  | 해당하는 장소 | 절대 포함하지 말 것 |
 |-------------|-------------|-----------------|
 | 카페         | 음료·디저트 전문 독립 카페, 베이커리 카페, 북카페, 애견 카페 | 방탈출카페, 공방카페, 스터디카페, 체인 카페 |
@@ -24,17 +31,17 @@ SYSTEM_PROMPT = """당신은 장소 탐색 에이전트입니다.
 | 바·주점      | 이자카야, 와인바, 칵테일바, 루프탑바, 맥주집 | |
 | 공원·자연    | 한강공원, 서울숲, 올림픽공원 등 야외 공간 | |
 
-[제외 대상 - 코스에 부적합]
-- 스터디카페, 독서실 (여가 목적 아님)
-- 병원, 약국, 은행
-- 편의점 단독 추천
+[절대 제외]
+- 스터디카페, 독서실, 병원, 약국, 은행, 편의점
+- 체인점 제외 요청 시: 체인카페·패스트푸드 카테고리 모두 제외
 
-[체인점 처리]
-- 사용자 입력에 "체인점 제외"가 있으면: category가 체인카페·패스트푸드인 장소 모두 제외
-- "체인점 포함"이면: 모든 카테고리 포함 가능
+[추천 이유 — 반드시 구체적으로]
+- reason 필드에 "이 장소가 이 코스에 왜 좋은지" 구체적으로 작성
+- "좋은 카페입니다" 같은 모호한 이유 금지
+- 예: "성수동 감성 인더스트리얼 카페로 인스타 핫플, 루프탑 뷰가 테마에 딱 맞음"
 
 반드시 아래 형식으로만 응답하세요 (다른 텍스트 없이):
-{"candidates": [{"name": "장소명", "category": "카테고리", "address": "주소", "reason": "추천 이유"}]}"""
+{"candidates": [{"name": "장소명", "category": "카테고리", "address": "주소", "reason": "구체적 추천 이유"}]}"""
 
 
 def _parse_json(text: str) -> dict:
@@ -90,7 +97,7 @@ def scout(plan: dict, exclude_places: list = None) -> list:
 
     exclude_note = f"\n제외할 장소 (이미 추천됨, 절대 포함 금지): {list(exclude_set)}" if exclude_set else ""
     response = client.chat.completions.create(
-        model="google/gemma-3-27b-it",
+        model="anthropic/claude-sonnet-4.6",
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": f"플랜: {json.dumps(plan, ensure_ascii=False)}\n후보 데이터: {json.dumps(candidates, ensure_ascii=False)}{exclude_note}"},
@@ -134,7 +141,7 @@ def scout_one(plan: dict, category: str, exclude_places: list = None) -> dict:
 
     exclude_note = f"\n제외할 장소: {list(exclude_set)}" if exclude_set else ""
     response = client.chat.completions.create(
-        model="google/gemma-3-27b-it",
+        model="anthropic/claude-sonnet-4.6",
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": f"아래 후보 중 {category} 카테고리에서 가장 적합한 장소 1곳만 추천하세요.\n후보: {json.dumps(candidates, ensure_ascii=False)}{exclude_note}"},
