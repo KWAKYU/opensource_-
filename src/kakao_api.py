@@ -1,10 +1,11 @@
 import os
 import requests
 import pandas as pd
+from src.seoul_spots import get_spot_info
 
 BASE_URL = "https://dapi.kakao.com/v2/local/search/keyword.json"
 
-# 소요 시간별 탐색 반경 (미터)
+# 소요 시간별 기본 탐색 반경 (미터) — seoul_spots에 반경 있으면 그걸 우선 사용
 RADIUS_BY_DURATION = {
     "2시간":    600,
     "반나절":   900,
@@ -13,10 +14,20 @@ RADIUS_BY_DURATION = {
 
 
 def geocode_location(location: str) -> tuple:
-    """지역명 → (경도 x, 위도 y) 반환. 역/상권 중심 우선, 실패 시 (None, None)"""
+    """
+    1순위: seoul_spots 사전 (해방촌·연남동 등 정확한 상권 중심)
+    2순위: Kakao 지하철역 검색
+    3순위: Kakao 키워드 검색
+    반환: (x경도, y위도) 또는 (None, None)
+    """
+    # 1. 직접 정의된 서울 상권 사전
+    spot = get_spot_info(location)
+    if spot:
+        return spot[0], spot[1]
+
+    # 2. Kakao — 역 우선
     headers = {"Authorization": f"KakaoAK {os.getenv('KAKAO_API_KEY')}"}
-    # 지하철역 or 상권 중심으로 먼저 시도 (더 정확한 나들이 중심점)
-    for query in [f"{location}역", f"{location} 번화가", location]:
+    for query in [f"{location}역", location]:
         params = {"query": query, "size": 1}
         try:
             response = requests.get(BASE_URL, headers=headers, params=params, timeout=5)
@@ -26,6 +37,14 @@ def geocode_location(location: str) -> tuple:
         except Exception:
             continue
     return None, None
+
+
+def get_radius(location: str, duration: str) -> int:
+    """상권별 고정 반경 우선, 없으면 duration 기반 기본값"""
+    spot = get_spot_info(location)
+    if spot:
+        return spot[2]  # seoul_spots의 반경
+    return RADIUS_BY_DURATION.get(duration, 900)
 
 
 def search_places(keyword: str, x=None, y=None, radius: int = 900) -> pd.DataFrame:
@@ -50,7 +69,7 @@ def search_places(keyword: str, x=None, y=None, radius: int = 900) -> pd.DataFra
 
 def search_by_category(category: str, location: str, budget_per_place: int,
                         duration: str = "반나절") -> pd.DataFrame:
-    radius = RADIUS_BY_DURATION.get(duration, 900)
+    radius = get_radius(location, duration)
 
     # 지역 중심 좌표 조회
     cx, cy = geocode_location(location)
