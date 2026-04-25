@@ -20,7 +20,7 @@ def search_price_from_blog(place_name: str) -> str:
         "X-Naver-Client-Id": client_id,
         "X-Naver-Client-Secret": client_secret,
     }
-    params = {"query": f"{place_name} 가격 후기", "display": 3, "sort": "sim"}
+    params = {"query": f"{place_name} 가격", "display": 5, "sort": "sim"}
 
     try:
         response = requests.get(BLOG_SEARCH_URL, headers=headers, params=params, timeout=5)
