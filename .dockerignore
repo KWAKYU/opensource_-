@@ -1,4 +1,5 @@
 .env
+.env.example
 .git
 .gitignore
 __pycache__
@@ -11,3 +12,6 @@ docs/
 tests/
 *.md
 .claude/
+make_ppt.py
+*.pptx
+~$*.pptx
