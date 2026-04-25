@@ -78,15 +78,13 @@ def _parse_json(text: str) -> dict:
 CAFE_GROUP = {"카페", "디저트", "체인카페"}
 
 def _fix_schedule(schedule: list) -> list:
-    """카페 계열 연속 배치 자동 수정"""
+    """카페 계열 연속 배치 자동 수정 — 두 번째 항목을 제거"""
     if len(schedule) < 2:
         return schedule
     fixed = [schedule[0]]
     for cat in schedule[1:]:
-        prev = fixed[-1]
-        if cat in CAFE_GROUP and prev in CAFE_GROUP:
-            # 카페 계열 연속 → 사이에 포토스팟 삽입
-            fixed.append("포토스팟")
+        if cat in CAFE_GROUP and fixed[-1] in CAFE_GROUP:
+            continue  # 카페 계열 연속 → 제거
         fixed.append(cat)
     return fixed
 

@@ -1,4 +1,5 @@
 from openai import OpenAI
+from src.agents.budget import CATEGORY_COST
 import os, json, re
 
 SYSTEM_PROMPT = """당신은 최종 검증 에이전트(Claude)입니다.
@@ -54,8 +55,6 @@ def verify(plan: dict, candidates: list, budget_result: dict, vibe_result: dict)
     content = response.choices[0].message.content or "{}"
     result = _parse_json(content)
 
-    budget_per = plan.get("budget_total", 0) // max(len(plan.get("schedule", [1])), 1)
-
     # final_course가 비어있으면 candidates로 직접 구성
     if not result.get("final_course") and candidates:
         result["final_course"] = [
@@ -64,15 +63,15 @@ def verify(plan: dict, candidates: list, budget_result: dict, vibe_result: dict)
                 "place": c.get("name", ""),
                 "category": c.get("category", ""),
                 "address": c.get("address", ""),
-                "estimated_cost": budget_per,
+                "estimated_cost": CATEGORY_COST.get(c.get("category", ""), 10000),
             }
             for i, c in enumerate(candidates)
         ]
 
-    # estimated_cost가 0이면 budget_per로 채우기
+    # estimated_cost가 0이면 카테고리별 단가로 채우기
     for step in result.get("final_course", []):
         if not step.get("estimated_cost"):
-            step["estimated_cost"] = budget_per
+            step["estimated_cost"] = CATEGORY_COST.get(step.get("category", ""), 10000)
 
     # total_cost는 항상 코드에서 재계산
     result["total_cost"] = sum(

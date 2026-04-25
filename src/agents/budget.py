@@ -2,6 +2,23 @@ from openai import OpenAI
 from src.naver_api import get_prices_for_candidates
 import os, json, re
 
+# 카테고리별 현실적 1인 기준 예상 단가 (Perplexity 실패 시 fallback)
+CATEGORY_COST = {
+    "맛집":    18000,
+    "카페":     8000,
+    "디저트":   7000,
+    "체인카페":  5000,
+    "패스트푸드": 8000,
+    "방탈출":  22000,
+    "공방·체험": 25000,
+    "액티비티": 20000,
+    "문화·전시": 12000,
+    "포토스팟": 8000,
+    "쇼핑":   20000,
+    "바·주점": 25000,
+    "공원·자연":  0,
+}
+
 SYSTEM_PROMPT = """당신은 예산 최적화 에이전트입니다.
 제안된 코스가 총 예산 안에 맞는지 분석하고, 초과 시 대안을 제시하세요.
 네이버 블로그 후기와 웹 검색 데이터를 참고해서 실제 가격에 가깝게 추정하세요.
@@ -66,12 +83,16 @@ def evaluate_budget(plan: dict, candidates: list) -> dict:
     content = response.choices[0].message.content or "{}"
     result = _parse_json(content)
 
-    # total_estimated가 0이면 예산 전액으로 대체 (파싱 실패 방어)
+    # total_estimated가 0이면 카테고리별 단가로 보정 (균등 분배 금지)
     if not result.get("total_estimated"):
-        budget_per = plan["budget_total"] // max(len(candidates), 1)
-        result["total_estimated"] = budget_per * len(candidates)
-        result["approved"] = True
+        total = 0
+        for c in candidates:
+            cat = c.get("category", "")
+            total += CATEGORY_COST.get(cat, plan["budget_total"] // max(len(candidates), 1))
+        result["total_estimated"] = total
+        result["approved"] = total <= plan["budget_total"]
         if not result.get("suggestion"):
-            result["suggestion"] = f"장소당 약 {budget_per:,}원 예상"
+            lines = [f"{c.get('name','')}: 약 {CATEGORY_COST.get(c.get('category',''), 0):,}원" for c in candidates]
+            result["suggestion"] = " / ".join(lines)
 
     return result
