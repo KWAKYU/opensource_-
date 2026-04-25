@@ -1,9 +1,17 @@
 from openai import OpenAI
+from src.naver_api import get_vibes_for_candidates
 import os, json, re
 
 SYSTEM_PROMPT = """당신은 코스 경험 평가 에이전트입니다.
-추천된 코스의 흐름, 동선, 테마 일치도를 평가하세요.
-코스가 단조롭거나 테마와 맞지 않으면 반박하고 개선안을 제시하세요.
+추천된 코스의 흐름, 동선, 테마 일치도를 평가하고 실제 방문자 후기 기반으로 분위기를 검토하세요.
+
+[평가 기준]
+- 동선: 장소 간 이동 거리/효율성
+- 테마 일치도: 사용자가 원하는 테마와 얼마나 맞는지
+- 분위기: 네이버 블로그 후기에서 수집한 실제 방문자 반응
+- 다양성: 코스가 단조롭지 않은지 (카페만 3곳 등 지양)
+
+코스에 문제가 있으면 objection에 구체적 이유를 명시하세요.
 반드시 아래 형식으로만 응답하세요 (다른 텍스트 없이):
 {"score": 8, "feedback": "코스 평가", "objection": null, "alternative": null}"""
 
@@ -33,11 +41,31 @@ def _parse_json(text: str) -> dict:
 
 def evaluate_vibe(plan: dict, candidates: list, budget_result: dict) -> dict:
     client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=os.getenv("OPENROUTER_API_KEY"))
+
+    # 네이버 블로그에서 분위기 후기 수집
+    print("    [네이버 블로그] 분위기 후기 검색 중...")
+    vibe_data = get_vibes_for_candidates(candidates)
+    vibe_context = ""
+    if vibe_data:
+        vibe_context = "\n\n[네이버 블로그 분위기 후기]\n" + "\n".join(
+            f"- {name}: {info}" for name, info in vibe_data.items()
+        )
+        print(f"    [네이버 블로그] {len(vibe_data)}개 장소 후기 수집 완료")
+    else:
+        print("    [네이버 블로그] 분위기 후기 없음")
+
+    user_content = (
+        f"코스 테마: {plan.get('theme', '')}\n"
+        f"코스: {json.dumps(candidates, ensure_ascii=False)}\n"
+        f"예산 평가: {json.dumps(budget_result, ensure_ascii=False)}"
+        f"{vibe_context}"
+    )
+
     response = client.chat.completions.create(
-        model="mistralai/mixtral-8x7b-instruct",
+        model="google/gemma-3-27b-it",
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": f"코스 테마: {plan.get('theme', plan.get('mood', ''))}\n코스: {json.dumps(candidates, ensure_ascii=False)}\n예산 평가: {json.dumps(budget_result, ensure_ascii=False)}"},
+            {"role": "user", "content": user_content},
         ],
         max_tokens=500,
     )

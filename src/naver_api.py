@@ -52,3 +52,52 @@ def get_prices_for_candidates(candidates: list) -> dict:
             if info:
                 price_data[name] = info
     return price_data
+
+
+def search_vibe_from_blog(place_name: str) -> str:
+    """네이버 블로그에서 장소 분위기/후기 정보 검색"""
+    client_id = os.getenv("NAVER_CLIENT_ID")
+    client_secret = os.getenv("NAVER_CLIENT_SECRET")
+    if not client_id or not client_secret:
+        return ""
+
+    headers = {
+        "X-Naver-Client-Id": client_id,
+        "X-Naver-Client-Secret": client_secret,
+    }
+    params = {"query": f"{place_name} 분위기 후기", "display": 3, "sort": "sim"}
+
+    try:
+        response = requests.get(BLOG_SEARCH_URL, headers=headers, params=params, timeout=5)
+        response.raise_for_status()
+        items = response.json().get("items", [])
+    except Exception:
+        return ""
+
+    # HTML 태그 제거 후 분위기 관련 키워드 추출
+    vibe_keywords = ["분위기", "조용", "시끄럽", "넓", "좁", "아늑", "인스타", "감성", "뷰", "야경",
+                     "데이트", "친구", "혼자", "커플", "북적", "힐링", "모던", "빈티지", "아기자기"]
+    vibe_info = []
+    for item in items:
+        description = re.sub(r"<[^>]+>", "", item.get("description", ""))
+        title = re.sub(r"<[^>]+>", "", item.get("title", ""))
+        # 분위기 키워드 포함된 문장만 추출
+        sentences = re.split(r"[.!?。]", description)
+        relevant = [s.strip() for s in sentences
+                    if any(k in s for k in vibe_keywords) and len(s.strip()) > 5]
+        if relevant:
+            vibe_info.append(f"{title}: {' / '.join(relevant[:2])}")
+
+    return "\n".join(vibe_info) if vibe_info else ""
+
+
+def get_vibes_for_candidates(candidates: list) -> dict:
+    """후보 장소 목록의 분위기 정보를 일괄 수집"""
+    vibe_data = {}
+    for c in candidates:
+        name = c.get("name", "")
+        if name:
+            info = search_vibe_from_blog(name)
+            if info:
+                vibe_data[name] = info
+    return vibe_data

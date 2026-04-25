@@ -83,7 +83,7 @@ def scout(plan: dict) -> list:
                 }
 
     response = client.chat.completions.create(
-        model="mistralai/mixtral-8x7b-instruct",
+        model="google/gemma-3-27b-it",
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": f"플랜: {json.dumps(plan, ensure_ascii=False)}\n후보 데이터: {json.dumps(candidates, ensure_ascii=False)}"},
