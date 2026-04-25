@@ -204,6 +204,7 @@ if run:
     st.session_state.pop("reroll_idx", None)
 
     initial_plan = plan(user_input)
+    initial_plan["location"] = location  # Planner 오류 방지: 사용자 입력 location으로 고정
     st.session_state["initial_plan"] = initial_plan
 
     result = run_debate(user_input, initial_plan)
