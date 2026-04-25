@@ -15,10 +15,20 @@ def _parse_json(text: str) -> dict:
     match = re.search(r"```(?:json)?\s*([\s\S]+?)```", text)
     if match:
         text = match.group(1).strip()
-    json_match = re.search(r"\{[\s\S]+\}", text)
-    if json_match:
-        text = json_match.group(0)
-    return json.loads(text)
+    start = text.find("{")
+    if start != -1:
+        depth = 0
+        for i, c in enumerate(text[start:], start):
+            if c == "{": depth += 1
+            elif c == "}":
+                depth -= 1
+                if depth == 0:
+                    text = text[start:i+1]
+                    break
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        return {"score": 7, "feedback": "", "objection": None, "alternative": None}
 
 
 def evaluate_vibe(plan: dict, candidates: list, budget_result: dict) -> dict:

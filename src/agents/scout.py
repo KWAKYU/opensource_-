@@ -12,14 +12,26 @@ def _parse_json(text: str) -> dict:
     text = text.strip()
     if not text:
         return {"candidates": []}
+    # ```json 블록 추출
     match = re.search(r"```(?:json)?\s*([\s\S]+?)```", text)
     if match:
         text = match.group(1).strip()
-    # JSON 블록만 추출
-    json_match = re.search(r"\{[\s\S]+\}", text)
-    if json_match:
-        text = json_match.group(0)
-    return json.loads(text)
+    # 첫 { 부터 매칭되는 마지막 } 까지만 추출
+    start = text.find("{")
+    if start != -1:
+        depth = 0
+        for i, c in enumerate(text[start:], start):
+            if c == "{":
+                depth += 1
+            elif c == "}":
+                depth -= 1
+                if depth == 0:
+                    text = text[start:i+1]
+                    break
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        return {"candidates": []}
 
 
 def scout(plan: dict) -> list:
