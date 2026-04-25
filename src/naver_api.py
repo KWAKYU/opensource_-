@@ -1,25 +1,64 @@
 import os
 import requests
 import re
+import pandas as pd
 
-
-NAVER_CLIENT_ID = os.getenv("NAVER_CLIENT_ID")
-NAVER_CLIENT_SECRET = os.getenv("NAVER_CLIENT_SECRET")
 BLOG_SEARCH_URL = "https://openapi.naver.com/v1/search/blog.json"
+LOCAL_SEARCH_URL = "https://openapi.naver.com/v1/search/local.json"
+
+
+def _naver_headers() -> dict:
+    return {
+        "X-Naver-Client-Id": os.getenv("NAVER_CLIENT_ID", ""),
+        "X-Naver-Client-Secret": os.getenv("NAVER_CLIENT_SECRET", ""),
+    }
+
+
+def search_places_naver(keyword: str, location: str) -> pd.DataFrame:
+    """네이버 지역 검색 API — Kakao 결과 없을 때 fallback"""
+    headers = _naver_headers()
+    if not headers["X-Naver-Client-Id"]:
+        return pd.DataFrame()
+
+    params = {"query": f"{location} {keyword}", "display": 5, "sort": "comment"}
+    try:
+        response = requests.get(LOCAL_SEARCH_URL, headers=headers, params=params, timeout=5)
+        response.raise_for_status()
+        items = response.json().get("items", [])
+    except Exception:
+        return pd.DataFrame()
+
+    if not items:
+        return pd.DataFrame()
+
+    rows = []
+    for item in items:
+        # HTML 태그 제거
+        name = re.sub(r"<[^>]+>", "", item.get("title", ""))
+        # mapx/mapy → 실제 경위도 (1/10,000,000 단위)
+        try:
+            x = int(item.get("mapx", 0)) / 10_000_000
+            y = int(item.get("mapy", 0)) / 10_000_000
+        except Exception:
+            x, y = None, None
+        rows.append({
+            "place_name": name,
+            "category_name": item.get("category", ""),
+            "address_name": item.get("address", ""),
+            "distance": 0,
+            "place_url": item.get("link", ""),
+            "x": x,
+            "y": y,
+        })
+
+    return pd.DataFrame(rows)
 
 
 def search_price_from_blog(place_name: str) -> str:
     """네이버 블로그에서 장소 가격 정보 검색"""
-    client_id = os.getenv("NAVER_CLIENT_ID")
-    client_secret = os.getenv("NAVER_CLIENT_SECRET")
-
-    if not client_id or not client_secret:
+    headers = _naver_headers()
+    if not headers["X-Naver-Client-Id"]:
         return ""
-
-    headers = {
-        "X-Naver-Client-Id": client_id,
-        "X-Naver-Client-Secret": client_secret,
-    }
     params = {"query": f"{place_name} 가격", "display": 5, "sort": "sim"}
 
     try:
@@ -56,15 +95,9 @@ def get_prices_for_candidates(candidates: list) -> dict:
 
 def search_vibe_from_blog(place_name: str) -> str:
     """네이버 블로그에서 장소 분위기/후기 정보 검색"""
-    client_id = os.getenv("NAVER_CLIENT_ID")
-    client_secret = os.getenv("NAVER_CLIENT_SECRET")
-    if not client_id or not client_secret:
+    headers = _naver_headers()
+    if not headers["X-Naver-Client-Id"]:
         return ""
-
-    headers = {
-        "X-Naver-Client-Id": client_id,
-        "X-Naver-Client-Secret": client_secret,
-    }
     params = {"query": f"{place_name} 분위기 후기", "display": 3, "sort": "sim"}
 
     try:

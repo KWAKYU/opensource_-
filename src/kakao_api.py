@@ -2,6 +2,7 @@ import os
 import requests
 import pandas as pd
 from src.seoul_spots import get_spot_info
+from src.naver_api import search_places_naver
 
 BASE_URL = "https://dapi.kakao.com/v2/local/search/keyword.json"
 
@@ -81,14 +82,18 @@ def search_by_category(category: str, location: str, budget_per_place: int,
         # 좌표 실패 시 키워드 검색 fallback
         df = search_places(f"{location} {category}")
 
+    # Kakao 결과 없으면 Naver 지역 검색 fallback
+    if df.empty:
+        df = search_places_naver(category, location)
+
     if df.empty:
         return df
 
     df["estimated_cost"] = budget_per_place
     df["category"] = category
 
-    # 반경 초과 장소 명시적 필터 (distance > 0인 경우에만)
+    # 반경 초과 장소 명시적 필터 (distance > 0인 경우에만, Kakao 결과만)
     if cx and cy and "distance" in df.columns:
-        df = df[df["distance"] <= radius]
+        df = df[(df["distance"] == 0) | (df["distance"] <= radius)]
 
     return df

@@ -97,7 +97,7 @@ def scout(plan: dict, exclude_places: list = None) -> list:
 
     exclude_note = f"\n제외할 장소 (이미 추천됨, 절대 포함 금지): {list(exclude_set)}" if exclude_set else ""
     response = client.chat.completions.create(
-        model="anthropic/claude-sonnet-4.6",
+        model="openai/gpt-4o-mini",
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": f"플랜: {json.dumps(plan, ensure_ascii=False)}\n후보 데이터: {json.dumps(candidates, ensure_ascii=False)}{exclude_note}"},
@@ -141,7 +141,7 @@ def scout_one(plan: dict, category: str, exclude_places: list = None) -> dict:
 
     exclude_note = f"\n제외할 장소: {list(exclude_set)}" if exclude_set else ""
     response = client.chat.completions.create(
-        model="anthropic/claude-sonnet-4.6",
+        model="openai/gpt-4o-mini",
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": f"아래 후보 중 {category} 카테고리에서 가장 적합한 장소 1곳만 추천하세요.\n후보: {json.dumps(candidates, ensure_ascii=False)}{exclude_note}"},

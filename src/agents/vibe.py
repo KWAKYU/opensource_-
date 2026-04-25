@@ -72,7 +72,7 @@ def evaluate_vibe(plan: dict, candidates: list, budget_result: dict) -> dict:
     )
 
     response = client.chat.completions.create(
-        model="google/gemma-3-27b-it",
+        model="google/gemini-2.0-flash-001",
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_content},
