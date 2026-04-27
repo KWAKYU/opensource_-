@@ -1,6 +1,6 @@
 from openai import OpenAI
 from src.naver_api import get_vibes_for_candidates
-import os, json, re
+import os, json, re, time
 
 SYSTEM_PROMPT = """당신은 코스 경험 평가 에이전트(Experience)입니다.
 추천 코스를 실제 방문자 관점에서 냉정하게 평가하세요. 좋은 점만 말하지 말고, 문제가 있으면 반드시 지적하세요.
@@ -71,10 +71,10 @@ def evaluate_vibe(plan: dict, candidates: list, budget_result: dict) -> dict:
         f"{vibe_context}"
     )
 
-    for model in ["google/gemini-2.0-flash-001", "openai/gpt-4o-mini"]:
+    for attempt in range(3):
         try:
             response = client.chat.completions.create(
-                model=model,
+                model="google/gemini-2.0-flash-001",
                 messages=[
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": user_content},
@@ -85,7 +85,9 @@ def evaluate_vibe(plan: dict, candidates: list, budget_result: dict) -> dict:
             return _parse_json(content)
         except Exception as e:
             if "429" in str(e) or "rate" in str(e).lower():
-                print(f"    [Experience] {model} rate limit → 다음 모델로 전환")
-                continue
-            raise
+                wait = 5 * (attempt + 1)
+                print(f"    [Experience] Gemini rate limit → {wait}초 후 재시도 ({attempt+1}/3)")
+                time.sleep(wait)
+            else:
+                raise
     return {"score": 7, "feedback": "평가 불가 (rate limit)", "objection": None, "alternative": None}
