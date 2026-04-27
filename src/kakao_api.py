@@ -50,6 +50,14 @@ def get_radius(location: str, duration: str) -> int:
 
 SUBWAY_KEYWORDS = ["지하", "지하상가", "지하도", "역사", "지하철"]
 
+# 이름에 이 단어가 있으면 음식점 — 비음식 카테고리 검색 결과에서 제거
+FOOD_NAME_KEYWORDS = [
+    "식당", "음식점", "육회", "연어", "초밥", "스시", "삼겹", "갈비", "치킨", "돈까스",
+    "라멘", "우동", "파스타", "피자", "버거", "국밥", "설렁탕", "곱창", "냉면",
+    "쌀국수", "보쌈", "족발", "샤부", "오마카세", "불판", "구이", "찜", "탕", "정식",
+]
+FOOD_CATEGORIES = {"맛집", "패스트푸드", "바·주점", "디저트"}
+
 
 def search_places(keyword: str, x=None, y=None, radius: int = 900) -> pd.DataFrame:
     headers = {"Authorization": f"KakaoAK {os.getenv('KAKAO_API_KEY')}"}
@@ -108,5 +116,11 @@ def search_by_category(category: str, location: str, budget_per_place: int,
     # 반경 초과 장소 명시적 필터 (distance > 0인 경우에만, Kakao 결과만)
     if cx and cy and "distance" in df.columns:
         df = df[(df["distance"] == 0) | (df["distance"] <= radius)]
+
+    # 비음식 카테고리 검색 결과에서 음식점 이름 가진 장소 제거
+    if category not in FOOD_CATEGORIES:
+        df = df[~df["place_name"].apply(
+            lambda name: any(k in str(name) for k in FOOD_NAME_KEYWORDS)
+        )]
 
     return df
