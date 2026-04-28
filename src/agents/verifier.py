@@ -1,6 +1,6 @@
 from openai import OpenAI
 from src.agents.budget import CATEGORY_COST
-import os, json, re
+import os, json, re, time
 
 # 이름에 이 단어가 있으면 무조건 맛집 (포토스팟/쇼핑 등으로 오분류 방지)
 FOOD_NAME_KEYWORDS = [
@@ -8,13 +8,16 @@ FOOD_NAME_KEYWORDS = [
     "라멘", "우동", "파스타", "피자", "버거", "국밥", "설렁탕", "곱창", "떡볶이",
     "냉면", "쌀국수", "보쌈", "족발", "샤부", "오마카세", "이자카야", "주점",
     "불판", "구이", "찜", "탕", "전골", "정식",
+    "한식", "일식", "중식", "양식", "분식", "회", "미도인",
+    "밥집", "고기", "닭", "해물", "해산물", "게", "새우", "조개", "굴", "전복",
+    "된장", "김치", "순두부", "부대", "샌드위치", "덮밥", "볶음", "무침", "전",
 ]
 
-# 반나절/하루종일별 카테고리 최대 허용 횟수
+# 소요 시간별 카테고리 최대 허용 횟수
 MAX_CATEGORY_COUNT = {
-    "2시간":    {"맛집": 1, "카페": 1, "디저트": 1},
-    "반나절":   {"맛집": 1, "카페": 2, "디저트": 1},
-    "하루 종일": {"맛집": 2, "카페": 2, "디저트": 1},
+    "2시간":    {"맛집": 1, "카페": 2, "디저트": 1},
+    "반나절":   {"맛집": 2, "카페": 2, "디저트": 2},
+    "하루 종일": {"맛집": 3, "카페": 3, "디저트": 2},
 }
 
 
@@ -103,15 +106,27 @@ def verify(plan: dict, candidates: list, budget_result: dict, vibe_result: dict)
         "budget_evaluation": budget_result,
         "vibe_evaluation": vibe_result,
     }
-    response = client.chat.completions.create(
-        model="anthropic/claude-3-haiku",
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": f"토론 전체 내용:\n{json.dumps(debate_context, ensure_ascii=False, indent=2)}"},
-        ],
-        max_tokens=1200,
-    )
-    content = response.choices[0].message.content or "{}"
+    for attempt in range(3):
+        try:
+            response = client.chat.completions.create(
+                model="google/gemini-2.0-flash-001",
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": f"토론 전체 내용:\n{json.dumps(debate_context, ensure_ascii=False, indent=2)}"},
+                ],
+                max_tokens=1200,
+            )
+            content = response.choices[0].message.content or "{}"
+            break
+        except Exception as e:
+            if "429" in str(e) or "rate" in str(e).lower():
+                wait = 5 * (attempt + 1)
+                print(f"    [Verifier] Gemini rate limit → {wait}초 후 재시도 ({attempt+1}/3)")
+                time.sleep(wait)
+            else:
+                raise
+    else:
+        content = "{}"
     result = _parse_json(content)
 
     # final_course가 비어있으면 candidates로 직접 구성

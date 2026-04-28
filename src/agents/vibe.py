@@ -74,7 +74,7 @@ def evaluate_vibe(plan: dict, candidates: list, budget_result: dict) -> dict:
     for attempt in range(3):
         try:
             response = client.chat.completions.create(
-                model="google/gemini-2.0-flash-001",
+                model="anthropic/claude-sonnet-4-5",
                 messages=[
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": user_content},

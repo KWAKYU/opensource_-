@@ -6,7 +6,13 @@ from src.agents.verifier import verify
 import json
 
 
-def run_debate(user_input: str, max_rounds: int = 3) -> dict:
+def _extract_rejected_names(objection: str, candidates: list) -> set:
+    if not objection:
+        return set()
+    return {c.get("name", "") for c in candidates if c.get("name") and c["name"] in objection}
+
+
+def run_debate(user_input: str, max_rounds: int = 5) -> dict:
     print(f"\n{'='*50}")
     print(f"[PLANNER] 요청 분석 중...")
     initial_plan = plan(user_input)
@@ -16,12 +22,18 @@ def run_debate(user_input: str, max_rounds: int = 3) -> dict:
     candidates = []
     budget_result = {}
     vibe_result = {}
+    previous_feedback = None
+    approved_candidates = []
+    round_exclude: set = set()
 
     for round_num in range(1, max_rounds + 1):
         print(f"\n--- Round {round_num} ---")
 
         print(f"[SCOUT] 장소 탐색 중...")
-        candidates = scout(initial_plan)
+        candidates = scout(initial_plan,
+                           exclude_places=list(round_exclude),
+                           previous_feedback=previous_feedback,
+                           approved_candidates=approved_candidates if round_num > 1 else None)
         print(f"[SCOUT] {len(candidates)}개 후보 발견")
         debate_log.append({"round": round_num, "agent": "Scout", "result": candidates})
 
@@ -32,19 +44,32 @@ def run_debate(user_input: str, max_rounds: int = 3) -> dict:
 
         print(f"[VIBE] 분위기 평가 중...")
         vibe_result = evaluate_vibe(initial_plan, candidates, budget_result)
-        print(f"[VIBE] 점수: {vibe_result.get('score')}/10 | {vibe_result.get('feedback')}")
+        score = vibe_result.get("score", 0)
+        objection = vibe_result.get("objection")
+        print(f"[VIBE] 점수: {score}/10 | {vibe_result.get('feedback')}")
+        if objection:
+            print(f"[VIBE] 반박: {objection}")
         debate_log.append({"round": round_num, "agent": "Vibe", "result": vibe_result})
 
-        # 예산 통과 + 분위기 7점 이상이면 조기 종료
-        if budget_result.get("approved") and vibe_result.get("score", 0) >= 7:
+        # 반박 장소 추출 → 다음 라운드에서 교체, 나머지 유지
+        rejected = _extract_rejected_names(objection or "", candidates)
+        if rejected:
+            print(f"[DEBATE] 교체 대상: {rejected}")
+        approved_candidates = [c for c in candidates if c.get("name") not in rejected]
+        round_exclude |= rejected
+
+        previous_feedback = f"점수: {score}/10\n평가: {vibe_result.get('feedback','')}"
+        if objection:
+            previous_feedback += f"\n반박: {objection}"
+
+        if round_num >= 2 and budget_result.get("approved") and score >= 8:
             print(f"\n[DEBATE] Round {round_num}에서 합의 완료")
             break
 
-        # 다음 라운드를 위해 플랜 보정
         if not budget_result.get("approved"):
             print(f"[DEBATE] 예산 초과 → 재조정")
-        if vibe_result.get("score", 0) < 7:
-            print(f"[DEBATE] 분위기 점수 부족 → 재탐색")
+        if score < 8:
+            print(f"[DEBATE] 점수 미달 ({score}/10) → 재탐색")
 
     print(f"\n[VERIFIER] 최종 검증 중 (Claude)...")
     final = verify(initial_plan, candidates, budget_result, vibe_result)

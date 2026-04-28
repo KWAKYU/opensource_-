@@ -51,13 +51,22 @@ with col4:
 run = st.button("🤖 코스 추천받기", use_container_width=True, type="primary")
 
 
+def _extract_rejected_names(objection: str, candidates: list) -> set:
+    """objection 텍스트에서 candidates 중 언급된 장소명 추출 → 교체 대상"""
+    if not objection:
+        return set()
+    return {c.get("name", "") for c in candidates if c.get("name") and c["name"] in objection}
+
+
 # ── 토론 실행 함수 ────────────────────────────────
 def run_debate(user_input, initial_plan, exclude_places=None):
     debate_log = []
     candidates = []
     budget_result = {}
     vibe_result = {}
-    previous_feedback = None  # 이전 라운드 반박 → 다음 Scout에 전달
+    previous_feedback = None   # 이전 라운드 반박 → 다음 Scout에 전달
+    approved_candidates = []   # Experience가 승인한 장소 → 다음 라운드 유지
+    round_exclude = set(exclude_places or [])  # 누적 제외 장소
 
     st.subheader("🤖 에이전트 토론 과정")
 
@@ -69,11 +78,14 @@ def run_debate(user_input, initial_plan, exclude_places=None):
         st.markdown(f"**— Round {round_num} —**")
 
         with st.status(f"🔍 Scout (GPT-4o mini) — 장소 탐색 중...", expanded=False) as s:
-            candidates = scout(initial_plan, exclude_places=exclude_places,
-                               previous_feedback=previous_feedback)
+            candidates = scout(initial_plan,
+                               exclude_places=list(round_exclude),
+                               previous_feedback=previous_feedback,
+                               approved_candidates=approved_candidates if round_num > 1 else None)
             st.write(f"{len(candidates)}개 장소 발견")
             for c in candidates:
-                st.write(f"• **{c.get('name', '')}** — {c.get('address', '')}")
+                kept = "🔒 유지" if c.get("name") in {a.get("name") for a in approved_candidates} else ""
+                st.write(f"• **{c.get('name', '')}** {kept} — {c.get('address', '')}")
                 st.caption(f"  추천 이유: {c.get('reason', '')}")
             debate_log.append({"round": round_num, "agent": "Scout", "result": candidates})
             s.update(label=f"✅ Scout — {len(candidates)}개 장소 발견", state="complete")
@@ -88,7 +100,7 @@ def run_debate(user_input, initial_plan, exclude_places=None):
             icon = "✅" if approved else "⚠️"
             s.update(label=f"{icon} Budget — {'승인' if approved else '예산 초과'} ({total:,}원)", state="complete")
 
-        with st.status(f"✨ Experience (Gemini) — 코스 평가 중...", expanded=False) as s:
+        with st.status(f"✨ Experience (Claude Sonnet) — 코스 평가 중...", expanded=False) as s:
             vibe_result = evaluate_vibe(initial_plan, candidates, budget_result)
             score = vibe_result.get("score", 0)
             feedback = vibe_result.get("feedback", "")
@@ -100,7 +112,14 @@ def run_debate(user_input, initial_plan, exclude_places=None):
             debate_log.append({"round": round_num, "agent": "Experience", "result": vibe_result})
             s.update(label=f"✅ Experience — {score}/10점", state="complete")
 
-            # 다음 라운드 Scout에 전달할 피드백 구성
+            # 반박에서 구체적 장소명 추출 → 해당 장소만 교체, 나머지는 유지
+            rejected_names = _extract_rejected_names(objection or "", candidates)
+            if rejected_names:
+                st.info(f"🔄 교체 대상: {', '.join(rejected_names)}")
+            approved_candidates = [c for c in candidates if c.get("name") not in rejected_names]
+            round_exclude |= rejected_names  # 반박된 장소는 이후 라운드에서도 제외
+
+            # 다음 라운드 Scout에 전달할 피드백
             previous_feedback = f"점수: {score}/10\n평가: {feedback}"
             if objection:
                 previous_feedback += f"\n반박: {objection}"
@@ -116,9 +135,14 @@ def run_debate(user_input, initial_plan, exclude_places=None):
                 reason.append(f"점수 미달 ({score}/10, 기준 8점)")
             st.warning(f"합의 미달 ({', '.join(reason)}) → 재토론")
 
-    with st.status("🏆 Verifier (Claude Haiku) — 최종 검증 중...", expanded=False) as s:
+    with st.status("🏆 Verifier (Gemini) — 최종 검증 중...", expanded=True) as s:
         final = verify(initial_plan, candidates, budget_result, vibe_result)
-        s.update(label="✅ Verifier — 최종 코스 확정", state="complete")
+        course = final.get("final_course", [])
+        for step in course:
+            icon = CATEGORY_ICON.get(step.get("category", ""), "📍")
+            st.write(f"{step.get('order','')}.  {icon} **{step.get('place','')}** — {step.get('category','')}  |  {step.get('estimated_cost',0):,}원")
+        st.caption(final.get("verdict", ""))
+        s.update(label=f"✅ Verifier — 최종 코스 확정 ({len(course)}곳)", state="complete")
 
     return {"plan": initial_plan, "candidates": candidates,
             "budget": budget_result, "vibe": vibe_result,

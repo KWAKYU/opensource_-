@@ -53,7 +53,7 @@ SYSTEM_PROMPT = """당신은 서울 나들이 코스의 장소 큐레이터(Scou
 - 체인점 제외 요청 시: 체인카페·패스트푸드 카테고리 모두 제외
 
 [오분류 방지 — 반드시 확인]
-- 장소 이름에 육회, 연어, 초밥, 스시, 갈비, 국밥, 냉면, 불판, 구이, 찜, 오마카세 등 음식 단어가 있으면 → 무조건 맛집
+- 장소 이름에 육회, 연어, 초밥, 스시, 갈비, 국밥, 냉면, 불판, 구이, 찜, 오마카세, 미도인, 한식, 일식, 중식, 양식, 고기, 해물, 밥집, 덮밥 등 음식 단어가 있으면 → 무조건 맛집
 - 포토스팟은 오직 포토부스·사진관·루프탑·인생네컷·포토스튜디오만 해당 — 음식점은 절대 포토스팟 아님
 
 [추천 이유 — 반드시 구체적으로]
@@ -91,58 +91,87 @@ def _parse_json(text: str) -> dict:
         return {"candidates": []}
 
 
-def scout(plan: dict, exclude_places: list = None, previous_feedback: str = None) -> list:
+def scout(plan: dict, exclude_places: list = None, previous_feedback: str = None,
+          approved_candidates: list = None) -> list:
     """
-    exclude_places: 이미 추천된 장소명 목록 (리롤 시 제외)
-    previous_feedback: 이전 라운드 Experience 에이전트의 반박/피드백 (재토론 시 반영)
+    exclude_places:      이미 추천된 장소명 목록 (리롤·재토론 시 제외)
+    previous_feedback:   이전 라운드 Experience 반박 (다음 Scout에 전달)
+    approved_candidates: Experience가 이미 승인한 장소 → 유지, 해당 카테고리 재탐색 생략
     """
     client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=os.getenv("OPENROUTER_API_KEY"))
     location = plan["location"]
     budget_per = plan["budget_total"] // max(len(plan["schedule"]), 1)
-    exclude_set = set(exclude_places or [])
+    duration = plan.get("duration", "반나절")
+
+    approved = list(approved_candidates or [])
+    # 승인된 장소명은 exclude에 포함 (재검색 안 함)
+    approved_names = {c.get("name", "") for c in approved}
+    exclude_set = set(exclude_places or []) | approved_names
+
+    # 승인 장소가 커버하는 카테고리 슬롯을 제외한 나머지만 탐색
+    remaining_sched = list(plan["schedule"])
+    for c in approved:
+        cat = c.get("category", "")
+        if cat in remaining_sched:
+            remaining_sched.remove(cat)
 
     candidates = []
     coord_map = {}
-    duration = plan.get("duration", "반나절")
-    for item in plan["schedule"]:
-        df = search_by_category(item, location, budget_per, duration=duration)
-        if not df.empty:
-            # 제외 장소 필터링 후 최대 8개
-            df_filtered = df[~df["place_name"].isin(exclude_set)]
-            top = df_filtered.head(8) if not df_filtered.empty else df.head(8)
-            candidates.append(top.to_dict(orient="records"))
-            for _, row in top.iterrows():
-                coord_map[row["place_name"]] = {
-                    "lat": float(row["y"]) if pd.notna(row["y"]) else None,
-                    "lng": float(row["x"]) if pd.notna(row["x"]) else None,
-                }
 
-    # 네이버 블로그 언급수로 인기도 지표 추가
-    print("    [블로그 카운트] 후보 장소 인기도 조회 중...")
-    candidates = add_blog_counts(candidates)
+    if remaining_sched:
+        print(f"    [Scout] 탐색 카테고리: {remaining_sched}" +
+              (f" (승인 유지: {[c.get('name','') for c in approved]})" if approved else ""))
+        for item in remaining_sched:
+            df = search_by_category(item, location, budget_per, duration=duration)
+            if not df.empty:
+                df_filtered = df[~df["place_name"].isin(exclude_set)]
+                # 후보 풀 12개로 확장
+                top = df_filtered.head(12) if not df_filtered.empty else df.head(12)
+                candidates.append(top.to_dict(orient="records"))
+                for _, row in top.iterrows():
+                    coord_map[row["place_name"]] = {
+                        "lat": float(row["y"]) if pd.notna(row["y"]) else None,
+                        "lng": float(row["x"]) if pd.notna(row["x"]) else None,
+                    }
 
-    exclude_note = f"\n제외할 장소 (이미 추천됨, 절대 포함 금지): {list(exclude_set)}" if exclude_set else ""
-    feedback_note = f"\n\n★ 이전 라운드 평가에서 지적된 문제점 — 반드시 반영하여 개선된 장소 선택:\n{previous_feedback}" if previous_feedback else ""
+        print("    [블로그 카운트] 후보 장소 인기도 조회 중...")
+        candidates = add_blog_counts(candidates)
+    else:
+        print("    [Scout] 모든 슬롯 승인 완료 — 재탐색 생략")
+        return approved
+
+    # LLM에는 remaining_sched 기준 플랜 전달 (필요한 슬롯만 채우도록)
+    search_plan = {**plan, "schedule": remaining_sched}
+    exclude_note = f"\n제외할 장소 (절대 포함 금지): {list(exclude_set)}" if exclude_set else ""
+    feedback_note = (f"\n\n★ 이전 라운드 평가에서 지적된 문제점 — 반드시 반영하여 개선된 장소 선택:\n{previous_feedback}"
+                     if previous_feedback else "")
+    approved_note = (f"\n\n★ 이미 확정된 장소 (재추천 금지, 참고용):\n{json.dumps(approved, ensure_ascii=False)}"
+                     if approved else "")
 
     response = client.chat.completions.create(
         model="openai/gpt-4o-mini",
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": f"플랜: {json.dumps(plan, ensure_ascii=False)}\n후보 데이터 (blog_count=네이버 블로그 언급수·인기도): {json.dumps(candidates, ensure_ascii=False)}{exclude_note}{feedback_note}"},
+            {"role": "user", "content": (
+                f"플랜: {json.dumps(search_plan, ensure_ascii=False)}\n"
+                f"후보 데이터 (blog_count=네이버 블로그 언급수·인기도): {json.dumps(candidates, ensure_ascii=False)}"
+                f"{exclude_note}{feedback_note}{approved_note}"
+            )},
         ],
         max_tokens=1200,
     )
     content = response.choices[0].message.content or "{}"
     result = _parse_json(content)
-    places = result.get("candidates", []) if isinstance(result, dict) else result
+    new_places = result.get("candidates", []) if isinstance(result, dict) else result
 
-    for p in places:
+    for p in new_places:
         name = p.get("name", "")
         coords = coord_map.get(name, {})
         p["lat"] = coords.get("lat")
         p["lng"] = coords.get("lng")
 
-    return places
+    # 승인된 장소 + 새로 탐색한 장소 합산 반환
+    return approved + new_places
 
 
 def scout_one(plan: dict, category: str, exclude_places: list = None) -> dict:
