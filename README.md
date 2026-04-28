@@ -2,6 +2,10 @@
 
 멀티에이전트 토론 기반 서울 나들이 코스 추천 시스템
 
+## 🚀 바로 실행하기
+**[https://kblxq6vycrhqsjbrnnxf3k.streamlit.app](https://kblxq6vycrhqsjbrnnxf3k.streamlit.app)**  
+설치 없이 브라우저에서 바로 사용 가능
+
 ## 문제 정의
 기존 코스 추천 앱(데이트팝, 카카오맵)은 단순 큐레이션 수준이다.  
 이 프로젝트는 **여러 AI 에이전트가 서로 토론하고 반박하며** 예산, 동선, 테마를 동시에 최적화한다.

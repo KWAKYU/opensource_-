@@ -9,23 +9,19 @@
 | 에이전트 | 모델 | 역할 |
 |---------|------|------|
 | Planner | Claude Sonnet 4.6 | 요청 분석, 전략 수립 |
-| Scout | Claude Sonnet 4.6 | Kakao API로 장소 탐색 및 품질 검증 |
+| Scout | GPT-4o mini | Kakao API로 장소 탐색 및 인기도 기반 품질 검증 |
 | Budget | Perplexity Sonar | 웹 검색 기반 실제 가격 추정 및 예산 검토 |
-| Experience | Gemma 3 27B | 네이버 블로그 후기 기반 분위기/코스 흐름 평가 |
-| Verifier | Claude Haiku | 토론 결과 최종 검증 및 코스 확정 |
+| Experience | Claude Sonnet 4.5 | 네이버 블로그 후기 기반 분위기/코스 흐름 평가 및 반박 |
+| Verifier | Gemini 2.0 Flash | 토론 결과 최종 검증 및 코스 확정 |
 
 ## 토론 프로토콜
 1. Planner가 요청 분석 → 구조화된 플랜 생성
-2. Scout → Budget → Vibe 순으로 각자 평가
-3. 예산 미통과 or 분위기 점수 7 미만 시 재토론 (최소 2라운드, 최대 5라운드)
-4. Verifier(Claude)가 최종 코스 확정
-
-## 팀 역할 분담
-
-- **팀원 A**: 에이전트 로직 (`src/agents/`, `src/debate.py`)
-- **팀원 B**: 인프라 (`Dockerfile`, `docker-compose.yml`, `api/`, `docs/`)
+2. Scout → Budget → Experience 순으로 각자 평가
+3. 예산 미통과 or Experience 점수 8점 미만 시 재토론 (최소 2라운드, 최대 5라운드)
+4. Experience 반박 장소만 교체, 승인된 장소는 유지 (approved_candidates)
+5. Verifier가 최종 코스 확정
 
 ## 성공 기준
 - 예산 초과 없이 코스 구성
-- Experience 점수 7점 이상
+- Experience 점수 8점 이상
 - 최대 5라운드 이내 합의
