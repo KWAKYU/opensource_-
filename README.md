@@ -2,9 +2,22 @@
 
 멀티에이전트 토론 기반 서울 나들이 코스 추천 시스템
 
-## 🚀 바로 실행하기
+## 🚀 바로 실행하기 (권장)
 **[https://kblxq6vycrhqsjbrnnxf3k.streamlit.app](https://kblxq6vycrhqsjbrnnxf3k.streamlit.app)**  
 설치 없이 브라우저에서 바로 사용 가능
+
+> **Streamlit 앱이 안 열릴 경우** (슬립 상태 또는 서버 오류)  
+> 아래 로컬 실행 방법을 사용하세요.  
+> `.env` 파일(API 키 포함)은 **별도 제공** 받으신 파일을 프로젝트 루트에 넣으시면 됩니다.
+>
+> ```bash
+> git clone https://github.com/KWAKYU/opensource_-
+> cd opensource_-
+> # .env 파일을 이 폴더에 복사 (별도 제공)
+> pip install -r requirements.txt
+> streamlit run app.py
+> # → http://localhost:8501 브라우저에서 접속
+> ```
 
 ## 문제 정의
 기존 코스 추천 앱(데이트팝, 카카오맵)은 단순 큐레이션 수준이다.  
@@ -16,11 +29,11 @@ User Input
     ↓
 [Planner - Claude Sonnet 4.6]    전략 수립, 카테고리 스케줄 설계
     ↓
-[Scout - Claude Sonnet 4.6]      Kakao API 장소 탐색 + 품질/인기도 검증
+[Scout - GPT-4o mini]            Kakao API 장소 탐색 + 인기도 기반 품질 검증
 [Budget - Perplexity Sonar]      웹 검색 기반 실제 가격 추정 및 예산 검토
-[Experience - Gemma 3 27B]       네이버 블로그 후기 기반 분위기/흐름 평가
+[Experience - Claude Sonnet 4.5] 네이버 블로그 후기 기반 분위기/흐름 평가 및 반박
     ↓ (최소 2 ~ 최대 5라운드 반복)
-[Verifier - Claude Haiku]        최종 코스 확정
+[Verifier - Gemini 2.0 Flash]    최종 코스 확정
 ```
 
 ## 기술 스택
